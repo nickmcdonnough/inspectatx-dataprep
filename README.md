@@ -1,36 +1,10 @@
 # dataprep
 
-FIXME: description
+### Description
 
-## Installation
+The tool that will be used by [InspectATX](http://github.com/nickmcdonnough/inspectatx) to retrieve the latest batch of inspection from the City of Austin data porta, parse it, and enter it into the database
 
-Download from http://example.com/FIXME.
+### To do
 
-## Usage
-
-FIXME: explanation
-
-    $ java -jar dataprep-0.1.0-standalone.jar [args]
-
-## Options
-
-FIXME: listing of options this app accepts.
-
-## Examples
-
-...
-
-### Bugs
-
-...
-
-### Any Other Sections
-### That You Think
-### Might be Useful
-
-## License
-
-Copyright © 2015 FIXME
-
-Distributed under the Eclipse Public License either version 1.0 or (at
-your option) any later version.
+1. Write functionality to fetch data from the portal
+2. Write functionality to enter new records into the db
