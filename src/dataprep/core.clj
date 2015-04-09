@@ -38,12 +38,6 @@
        :facility_id ((keyword "Facility ID") record)
        :description ((keyword "Process Description") record))}))
 
-(defn rebuild-csv [source-path destination]
-  (with-open [in  (io/reader source-path)
-              out (io/writer destination)]
-    (->>
-      (csv/read-csv in)
-      sc/mappify)))
 
 (defn write-pieces [r-out i-out data]
   (let [r (sc/vectorize (map :restaurant data))
