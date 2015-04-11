@@ -1,60 +1,57 @@
 (ns dataprep.core
-  (:require [clojure.java.io :as io]
+  (:require [dataprep.dbi :as dbi]
+            [clojure.java.io :as io]
             [clojure.string :as s]
             [clojure.data.csv :as csv]
             [semantic-csv.core :as sc]
             [clj-http.lite.client :as http]))
 
+(def coa-site "https://data.austintexas.gov/api/views/ecmv-9xxi/rows.csv?accessType=DOWNLOAD")
 
-(defn split-point [address]
-  "Takes the :Address value from a record and splits it up. Returns a map
-   containing the address and two new latitude and longitude fields."
-  (let [a (s/split address #"\n\(")
-        b (->> (s/split (last a) #",\s")
-               (assoc a 1)
-               flatten)]
-    {:address   (first b)
-     :latitude  (second b)
-     :longitude (last b)}))
+(defn fetch-csv []
+  (with-open [in (io/input-stream coa-site)
+              out (io/output-stream "allinspections.csv")]
+    (io/copy in out)))
 
 (defn clean-latlon [angle]
   "The purpose of this function is to verify that lat long is clean."
   (s/replace angle #"[^0-9\.\-]" ""))
 
-(defn rebuild-records [record]
-  (let [new-fields (split-point (:Address record))]
-    {:restaurant
-     (array-map
-       :facility_id ((keyword "Facility ID") record)
-       :name        ((keyword "Restaurant Name") record)
-       :zip         ((keyword "Zip Code") record)
-       :address     (:address new-fields)
-       :latitude    (-> new-fields :latitude clean-latlon)
-       :longitude   (-> new-fields :longitude clean-latlon))
-     :inspection
-     (array-map
-       :date        ((keyword "Inspection Date") record)
-       :score       (:Score record)
-       :facility_id ((keyword "Facility ID") record)
-       :description ((keyword "Process Description") record))}))
+(defn split-point [address]
+  "Takes the :Address value from a record and splits it up. Returns a map
+   containing the address and two new latitude and longitude fields."
+  (let [[addr-part lat-part] (s/split address #"\n\(")
+        [lat long]           (s/split lat-part #",\s")]
+    {:address   addr-part
+     :latitude  (clean-latlon lat)
+     :longitude (clean-latlon long)}))
 
+(defn record->restaurant [record]
+  (merge (split-point (:Address record))
+         {:facility_id (get record (keyword "Facility ID"))
+          :name        (get record (keyword "Restaurant Name"))
+          :zip         (get record (keyword "Zip Code"))}))
 
-(defn write-pieces [r-out i-out data]
-  (let [r (sc/vectorize (map :restaurant data))
-        i (sc/vectorize (map :inspection data))]
-    (csv/write-csv r-out r)
-    (csv/write-csv i-out i)
-    true))
+(defn record->inspection [record]
+  {:date        (get record (keyword "Inspection Date"))
+   :score       (get record :Score)
+   :facility_id (get record (keyword "Facility ID"))
+   :description (get record (keyword "Process Description"))})
 
-(defn split-csv [in out1 out2]
-  (with-open [in-file (io/reader in)
-              r-out (io/writer out1)
-              i-out (io/writer out2)]
-    (->>
-      (csv/read-csv in-file)
-      sc/remove-comments
-      sc/mappify
-      (map
-        (fn [row]
-          (rebuild-records row)))
-      (write-pieces r-out i-out))))
+(defn read-input-csv [filename]
+  (with-open [in-file (io/reader filename)]
+    (doall
+     (->> (csv/read-csv in-file)
+          (sc/remove-comments)
+          (sc/mappify)))))
+
+(defn write-csv [filename dataset]
+  (with-open [writer (io/writer filename)]
+    (csv/write-csv writer (sc/vectorize dataset))))
+
+(defn split-csv [in restaurant-output inspection-output]
+  (let [records     (read-input-csv in)
+        restaurants (map record->restaurant records)
+        inspections (map record->inspection records)]
+    (write-csv restaurant-output restaurants)
+    (write-csv inspection-output inspections)))
